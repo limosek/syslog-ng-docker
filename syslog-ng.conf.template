@@ -1,0 +1,61 @@
+@version: 4.8
+    
+      options {
+        keep_hostname(yes);
+        frac-digits(3);
+        stats(level(3), freq(0));
+      };
+    
+      filter f_rate_limit {
+        rate-limit(
+          rate(${MAX_EPS})
+        );
+      };
+      
+      rewrite r_meta {
+          set("${SOURCE_ID}", value(".SDATA.META.${SDATA_VARIABLE}"));
+      };
+    
+      source s_internal {
+        internal();
+      };
+    
+      source s_net_514 {
+        syslog(
+          ip(0.0.0.0)
+          flags(syslog-protocol,store-raw-message)
+          port(514)
+        );
+      };
+  
+      destination d_local {
+          file(
+                  "/var/log/${SOURCE_NAME}.log"
+                  ts-format(iso)
+                  template("$RAWMSG\n")
+          );
+      };
+    
+      destination d_console {
+        file("/dev/stdout");
+      };
+    
+      destination d_syslogng_errors {
+        file(
+            "/var/log/syslog-ng.log"
+        ); 
+      };
+    
+      log {
+        source(s_net_514);
+        filter(f_rate_limit);
+        destination(d_local);
+      };
+
+      log {
+        source(s_internal);
+        destination(d_syslogng_errors);
+        destination(d_console);
+      };
+    
+@include "/etc/syslog-ng/conf.d/*.conf"
